@@ -5,9 +5,13 @@ import '../models/user.dart';
 
 // Talks to the backend /api/auth endpoints and stores the session.
 class AuthService {
-  // On Chrome or desktop, localhost works. See notes at the bottom of this
-  // file for Android emulator and iOS simulator differences.
-  static const String baseUrl = 'http://localhost:5000';
+  // Base URL for the API. Override at build time with:
+  //   flutter build web --release --dart-define=API_BASE_URL=https://your-backend.com
+  // Defaults to localhost for local development.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:5000',
+  );
 
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'auth_user';
@@ -25,12 +29,12 @@ class AuthService {
       body: jsonEncode({
         'email': email,
         'password': password,
-        // The selected role is a hint only. The backend re-checks.
         'selected_role': selectedRole,
       }),
     );
 
-    final Map<String, dynamic> body = jsonDecode(response.body);
+    final Map<String, dynamic> body =
+        jsonDecode(response.body) as Map<String, dynamic>;
 
     if (response.statusCode != 200) {
       throw Exception(body['message'] ?? 'Login failed.');

@@ -29,6 +29,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   List<Resident> _residents = [];
   bool _loading = true;
   bool _saving = false;
+  String? _error;
 
   @override
   void initState() {
@@ -47,8 +48,10 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
-      _show(e.toString().replaceFirst('Exception: ', ''));
+      setState(() {
+        _loading = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
@@ -67,10 +70,13 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   Future<void> _save() async {
     if (_residentId == null || _name.text.trim().isEmpty) {
-      _show('Resident and medication name are required.');
+      setState(() => _error = 'Resident and medication name are required.');
       return;
     }
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await _service.create({
         'resident_id': _residentId,
@@ -94,14 +100,11 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      _show(e.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _saving = false;
+      });
     }
-  }
-
-  void _show(String m) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
   @override
@@ -109,6 +112,20 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+
+    if (_residents.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Add Medication',
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.bold)),
+          backgroundColor: AppColors.surface,
+        ),
+        body: const _NoResidents(),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -123,11 +140,8 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _dropdownResident(),
-              _row([
-                _field('Medication Name', _name),
-                _field('Dosage', _dosage),
-              ]),
+              _residentDropdown(),
+              _row([_field('Medication Name', _name), _field('Dosage', _dosage)]),
               _row([
                 _field('Frequency', _frequency),
                 _field('Route (Oral, Topical, etc.)', _route),
@@ -149,54 +163,12 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                       style: TextStyle(fontSize: 12)),
                 ],
               ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                _errorBox(_error!),
+              ],
               const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 46,
-                      child: OutlinedButton(
-                        onPressed: _saving
-                            ? null
-                            : () => Navigator.pop(context, false),
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          side: const BorderSide(color: AppColors.border),
-                          foregroundColor: AppColors.textDark,
-                        ),
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 46,
-                      child: ElevatedButton(
-                        onPressed: _saving ? null : _save,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: _saving
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
-                                ),
-                              )
-                            : const Text('Save Medication'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              _actionButtons(),
             ],
           ),
         ),
@@ -254,7 +226,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     );
   }
 
-  Widget _dropdownResident() {
+  Widget _residentDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -267,6 +239,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                   color: AppColors.textDark)),
           const SizedBox(height: 6),
           Container(
+            height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -277,17 +250,140 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
               child: DropdownButton<int>(
                 value: _residentId,
                 isExpanded: true,
+                hint: const Text('Select a resident',
+                    style: TextStyle(
+                        fontSize: 14, color: AppColors.textMuted)),
                 onChanged: (v) => setState(() => _residentId = v),
                 items: _residents
                     .map((r) => DropdownMenuItem(
                           value: r.id,
-                          child: Text('${r.fullName} (Room ${r.room ?? '-'})'),
+                          child: Text(
+                            '${r.fullName} (Room ${r.room ?? '-'})',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 14),
+                          ),
                         ))
                     .toList(),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _errorBox(String msg) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.danger.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, size: 18, color: AppColors.danger),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(msg,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textDark)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 46,
+            child: OutlinedButton(
+              onPressed:
+                  _saving ? null : () => Navigator.pop(context, false),
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                side: const BorderSide(color: AppColors.border),
+                foregroundColor: AppColors.textDark,
+              ),
+              child: const Text('Cancel'),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SizedBox(
+            height: 46,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: _saving
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Save Medication'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NoResidents extends StatelessWidget {
+  const _NoResidents();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.info_outline,
+                size: 48, color: AppColors.textMuted),
+            const SizedBox(height: 16),
+            const Text('No residents yet',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textDark)),
+            const SizedBox(height: 8),
+            const Text(
+              'Add a resident first, then you can add medication.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Go back'),
+            ),
+          ],
+        ),
       ),
     );
   }

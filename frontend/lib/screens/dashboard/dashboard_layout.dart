@@ -10,6 +10,7 @@ class DashboardNavItem {
 }
 
 // Shared sidebar and header used by all four role dashboards.
+// On narrow screens, the sidebar becomes a drawer.
 class DashboardLayout extends StatelessWidget {
   const DashboardLayout({
     super.key,
@@ -28,107 +29,192 @@ class DashboardLayout extends StatelessWidget {
   final VoidCallback onLogout;
   final Widget child;
 
+  // Width at which the layout switches between drawer and fixed sidebar.
+  static const double _mobileBreakpoint = 800;
+
   @override
   Widget build(BuildContext context) {
+    final double width = MediaQuery.of(context).size.width;
+    final bool isWide = width >= _mobileBreakpoint;
+
+    if (isWide) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Row(
+          children: [
+            _buildSidebar(context, isMobile: false),
+            Expanded(
+              child: Column(
+                children: [
+                  _buildHeader(context),
+                  Expanded(child: child),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Mobile layout: AppBar with hamburger opens the sidebar as a drawer.
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Row(
-        children: [
-          _buildSidebar(),
-          Expanded(
-            child: Column(
-              children: [
-                _buildHeader(),
-                Expanded(child: child),
-              ],
+      appBar: AppBar(
+        backgroundColor: AppColors.primaryDark,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(
+                Icons.home_work_outlined,
+                color: AppColors.primary,
+                size: 16,
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebar() {
-    return Container(
-      width: 220,
-      color: AppColors.primaryDark,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Brand row.
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'CareHome Connect',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        actions: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.home_work_outlined,
-                    color: AppColors.primary,
-                    size: 18,
-                  ),
+            padding: const EdgeInsets.only(right: 12),
+            child: CircleAvatar(
+              radius: 15,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              child: Text(
+                user.firstName.isNotEmpty
+                    ? user.firstName[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
                 ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'CareHome Connect',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Care . Support . Together',
-                        style: TextStyle(color: Colors.white70, fontSize: 9),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Navigation.
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              children: navItems.map(_buildNavTile).toList(),
-            ),
-          ),
-          // Logout.
-          InkWell(
-            onTap: onLogout,
-            child: const Padding(
-              padding: EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Icon(Icons.logout, color: Colors.white, size: 16),
-                  SizedBox(width: 10),
-                  Text(
-                    'Logout',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ],
               ),
             ),
           ),
         ],
       ),
+      drawer: Drawer(
+        child: _buildSidebar(context, isMobile: true),
+      ),
+      body: child,
     );
   }
 
-  Widget _buildNavTile(DashboardNavItem item) {
+  Widget _buildSidebar(BuildContext context, {required bool isMobile}) {
+    return Container(
+      width: isMobile ? null : 220,
+      color: AppColors.primaryDark,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Brand row (hidden on mobile because the AppBar already has it).
+            if (!isMobile)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.home_work_outlined,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'CareHome Connect',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Care . Support . Together',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Navigation.
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                children: navItems
+                    .map((item) => _buildNavTile(context, item, isMobile))
+                    .toList(),
+              ),
+            ),
+
+            // Logout.
+            InkWell(
+              onTap: () {
+                if (isMobile) Navigator.of(context).pop();
+                onLogout();
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.white, size: 16),
+                    SizedBox(width: 10),
+                    Text(
+                      'Logout',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavTile(
+      BuildContext context, DashboardNavItem item, bool isMobile) {
     final bool active = item.label == activeItem;
     return InkWell(
-      onTap: () => onSelect(item.label),
+      onTap: () {
+        // Close the drawer on mobile before switching pages.
+        if (isMobile) Navigator.of(context).pop();
+        onSelect(item.label);
+      },
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -144,6 +230,7 @@ class DashboardLayout extends StatelessWidget {
             Expanded(
               child: Text(
                 item.label,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -157,7 +244,8 @@ class DashboardLayout extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  // Wide screen only header.
+  Widget _buildHeader(BuildContext context) {
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),

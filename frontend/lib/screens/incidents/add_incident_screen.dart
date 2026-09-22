@@ -32,15 +32,11 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
   List<Resident> _residents = [];
   bool _loading = true;
   bool _saving = false;
+  String? _error;
 
   static const List<String> _types = [
-    'Fall',
-    'Accident',
-    'Injury',
-    'Missing item',
-    'Medication error',
-    'Behavioural',
-    'Other',
+    'Fall', 'Accident', 'Injury', 'Missing item',
+    'Medication error', 'Behavioural', 'Other',
   ];
 
   bool get _isEdit => widget.existing != null;
@@ -79,8 +75,10 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
-      _show(e.toString().replaceFirst('Exception: ', ''));
+      setState(() {
+        _loading = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
@@ -97,14 +95,17 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
 
   Future<void> _save() async {
     if (_description.text.trim().isEmpty) {
-      _show('Description is required.');
+      setState(() => _error = 'Description is required.');
       return;
     }
     if (_date.text.trim().isEmpty) {
-      _show('Date is required.');
+      setState(() => _error = 'Date is required.');
       return;
     }
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     final payload = {
       'resident_id': _residentId,
       'incident_type': _type,
@@ -130,14 +131,11 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      _show(e.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _saving = false;
+      });
     }
-  }
-
-  void _show(String m) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
   @override
@@ -149,10 +147,9 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(
-          _isEdit ? 'Edit Incident' : 'Report Incident',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
+        title: Text(_isEdit ? 'Edit Incident' : 'Report Incident',
+            style: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.surface,
       ),
       body: SingleChildScrollView(
@@ -162,11 +159,27 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _dropdownResident(),
-              _row([
-                _dropdownType(),
-                _dropdownStatus(),
-              ]),
+              // Resident is optional for incidents (e.g. property damage).
+              // Show a clear message if there are no residents yet.
+              if (_residents.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppColors.accent.withOpacity(0.4)),
+                  ),
+                  child: const Text(
+                    'No residents yet. You can still report a general incident.',
+                    style: TextStyle(
+                        fontSize: 12, color: AppColors.textDark),
+                  ),
+                )
+              else
+                _residentDropdown(),
+              _row([_typeDropdown(), _statusDropdown()]),
               _row([
                 _field('Date (YYYY-MM-DD)', _date),
                 _field('Time (HH:MM)', _time),
@@ -175,54 +188,12 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
               _field('Description', _description, lines: 4),
               _field('People Involved', _people, lines: 2),
               _field('Action Taken', _action, lines: 3),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                _errorBox(_error!),
+              ],
               const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 46,
-                      child: OutlinedButton(
-                        onPressed: _saving
-                            ? null
-                            : () => Navigator.pop(context, false),
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          side: const BorderSide(color: AppColors.border),
-                          foregroundColor: AppColors.textDark,
-                        ),
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 46,
-                      child: ElevatedButton(
-                        onPressed: _saving ? null : _save,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: _saving
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
-                                ),
-                              )
-                            : Text(_isEdit ? 'Update' : 'Submit Report'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              _actionButtons(),
             ],
           ),
         ),
@@ -280,7 +251,7 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
     );
   }
 
-  Widget _dropdownResident() {
+  Widget _residentDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -293,6 +264,7 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
                   color: AppColors.textDark)),
           const SizedBox(height: 6),
           Container(
+            height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -303,13 +275,22 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
               child: DropdownButton<int?>(
                 value: _residentId,
                 isExpanded: true,
+                hint: const Text('None / Not resident related',
+                    style: TextStyle(
+                        fontSize: 14, color: AppColors.textMuted)),
                 onChanged: (v) => setState(() => _residentId = v),
                 items: [
                   const DropdownMenuItem(
-                      value: null, child: Text('None / Not resident related')),
+                      value: null,
+                      child: Text('None / Not resident related',
+                          style: TextStyle(fontSize: 14))),
                   ..._residents.map((r) => DropdownMenuItem(
                         value: r.id,
-                        child: Text('${r.fullName} (Room ${r.room ?? '-'})'),
+                        child: Text(
+                          '${r.fullName} (Room ${r.room ?? '-'})',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14),
+                        ),
                       )),
                 ],
               ),
@@ -320,7 +301,7 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
     );
   }
 
-  Widget _dropdownType() {
+  Widget _typeDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -333,6 +314,7 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
                   color: AppColors.textDark)),
           const SizedBox(height: 6),
           Container(
+            height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -345,7 +327,11 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
                 isExpanded: true,
                 onChanged: (v) => setState(() => _type = v!),
                 items: _types
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                    .map((t) => DropdownMenuItem(
+                          value: t,
+                          child:
+                              Text(t, style: const TextStyle(fontSize: 14)),
+                        ))
                     .toList(),
               ),
             ),
@@ -355,7 +341,7 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
     );
   }
 
-  Widget _dropdownStatus() {
+  Widget _statusDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -368,6 +354,7 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
                   color: AppColors.textDark)),
           const SizedBox(height: 6),
           Container(
+            height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -391,6 +378,77 @@ class _AddIncidentScreenState extends State<AddIncidentScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _errorBox(String msg) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.danger.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, size: 18, color: AppColors.danger),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(msg,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textDark)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 46,
+            child: OutlinedButton(
+              onPressed:
+                  _saving ? null : () => Navigator.pop(context, false),
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                side: const BorderSide(color: AppColors.border),
+                foregroundColor: AppColors.textDark,
+              ),
+              child: const Text('Cancel'),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SizedBox(
+            height: 46,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: _saving
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(_isEdit ? 'Update' : 'Submit Report'),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
