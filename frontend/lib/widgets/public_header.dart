@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 
 // Top navigation bar for all public website pages.
+// On wide screens, shows all links. On mobile, shows a hamburger.
 class PublicHeader extends StatelessWidget {
-  const PublicHeader({super.key, this.currentRoute});
+  const PublicHeader({
+    super.key,
+    this.currentRoute,
+    this.onMenuTap,
+  });
 
-  // Name of the current page, used to highlight the active link.
   final String? currentRoute;
+  final VoidCallback? onMenuTap;
 
   static const List<_NavItem> _items = [
     _NavItem('Home', '/'),
@@ -27,9 +32,15 @@ class PublicHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double width = MediaQuery.of(context).size.width;
+    final bool isMobile = width < 900;
+
     return Container(
       color: AppColors.surface,
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: 14,
+      ),
       child: Row(
         children: [
           // Logo.
@@ -57,7 +68,7 @@ class PublicHeader extends StatelessWidget {
                     Text(
                       'CareHome Connect',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
                       ),
@@ -75,12 +86,10 @@ class PublicHeader extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(width: 32),
-
-          // Menu links.
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
+          if (!isMobile) ...[
+            const SizedBox(width: 32),
+            // Wide screens: inline links.
+            Expanded(
               child: Row(
                 children: _items.map((item) {
                   final bool active = item.route == currentRoute;
@@ -94,8 +103,9 @@ class PublicHeader extends StatelessWidget {
                           item.label,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight:
-                                active ? FontWeight.w600 : FontWeight.w500,
+                            fontWeight: active
+                                ? FontWeight.w600
+                                : FontWeight.w500,
                             color: active
                                 ? AppColors.primary
                                 : AppColors.textDark,
@@ -107,30 +117,41 @@ class PublicHeader extends StatelessWidget {
                 }).toList(),
               ),
             ),
-          ),
-
-          // Login button. Wired up in Step 6.
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pushNamed(context, '/login');
-            },
-            
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+            // Login button.
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/login');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
               ),
-              elevation: 0,
+              child: const Text('Login'),
             ),
-            child: const Text('Login'),
-          ),
+          ] else ...[
+            // Mobile: hamburger on the right.
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.menu, color: AppColors.primary, size: 26),
+              onPressed: onMenuTap,
+              tooltip: 'Menu',
+            ),
+          ],
         ],
       ),
     );
   }
+
+  // Used by the layout wrapper to build the mobile drawer.
+  static List<_NavItem> get navItems => _items;
 }
 
 class _NavItem {
