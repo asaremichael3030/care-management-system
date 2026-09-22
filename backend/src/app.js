@@ -66,7 +66,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/audit-logs', auditLogsRoutes);
 app.use('/api/invitations', invitationsRoutes);
 app.use('/api/activities', activitiesRoutes);
-app.use(cors());
+app.use(cors({origin: 'https://carehomesystem.netlify.app/',}));
 
 app.use(notFound);
 app.use(errorHandler);
