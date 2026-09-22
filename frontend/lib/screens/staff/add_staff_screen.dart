@@ -29,10 +29,11 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   String? _error;
 
   static const List<String> _roles = [
-    'Administrator',
-    'Manager / Senior Carer',
-    'Care Worker',
-  ];
+  'Administrator',
+  'Manager / Senior Carer',
+  'Care Worker',
+  'Family Member',
+];
 
   @override
   void dispose() {

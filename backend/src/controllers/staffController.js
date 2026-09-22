@@ -7,7 +7,14 @@ const {
   cleanString,
 } = require('../utils/validation');
 
+// Staff roles get a row in the staff table.
 const STAFF_ROLES = ['Administrator', 'Manager / Senior Carer', 'Care Worker'];
+
+// Family Members can be created from the same form, but do not get a
+// staff profile. They are linked to residents from the Family Links page.
+const OTHER_ROLES = ['Family Member'];
+
+const ALL_ROLES = [...STAFF_ROLES, ...OTHER_ROLES];
 
 // Shared SELECT used by listStaff, getStaff and createStaff so the shape
 // of the response is always the same.
@@ -99,10 +106,10 @@ async function createStaff(req, res, next) {
       });
     }
 
-    if (!STAFF_ROLES.includes(role)) {
+    if (!ALL_ROLES.includes(role)) {
       return res.status(400).json({
         message:
-          'Role must be Administrator, Manager / Senior Carer, or Care Worker.',
+          'Role must be Administrator, Manager / Senior Carer, Care Worker, or Family Member.',
       });
     }
 
@@ -125,7 +132,7 @@ async function createStaff(req, res, next) {
       `INSERT INTO users
          (first_name, last_name, email, phone, password_hash, role, status)
        VALUES ($1,$2,$3,$4,$5,$6,'active')
-       RETURNING id`,
+       RETURNING id, first_name, last_name, email, phone, role, status`,
       [
         cleanString(first_name, 100),
         cleanString(last_name, 100),
@@ -136,15 +143,46 @@ async function createStaff(req, res, next) {
       ],
     );
 
-    const userId = userResult.rows[0].id;
+    const userRow = userResult.rows[0];
 
+    // Family Members do not get a staff profile.
+    if (role === 'Family Member') {
+      await client.query('COMMIT');
+
+      log(req, {
+        action: 'create',
+        entityType: 'user',
+        entityId: userRow.id,
+        description: `Created family member ${first_name} ${last_name}`,
+      });
+
+      // Return a shape the frontend can parse as a "Staff" object even
+      // though no staff row was created. Staff-specific fields are null.
+      return res.status(201).json({
+        id: userRow.id,
+        user_id: userRow.id,
+        job_title: null,
+        department: null,
+        employment_status: 'active',
+        hire_date: null,
+        notes: null,
+        first_name: userRow.first_name,
+        last_name: userRow.last_name,
+        email: userRow.email,
+        phone: userRow.phone,
+        role: userRow.role,
+        user_status: userRow.status,
+      });
+    }
+
+    // Staff roles get a staff profile.
     const staffResult = await client.query(
       `INSERT INTO staff
         (user_id, job_title, department, employment_status, hire_date, notes)
        VALUES ($1,$2,$3,$4,$5,$6)
        RETURNING id`,
       [
-        userId,
+        userRow.id,
         cleanString(job_title, 120),
         cleanString(department, 120),
         employment_status || 'active',
@@ -157,7 +195,6 @@ async function createStaff(req, res, next) {
 
     await client.query('COMMIT');
 
-    // Fetch the joined row so the response shape matches listStaff.
     const joined = await pool.query(
       `${STAFF_SELECT} WHERE s.id = $1`,
       [staffId],
