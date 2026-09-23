@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../theme.dart';
 import '../../services/auth_service.dart';
@@ -71,6 +72,56 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+
+  // Shows a dialog explaining how to reset the password.
+  void _showForgotPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text(
+          'Forgot password',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            decoration: TextDecoration.none,
+          ),
+        ),
+        content: const Text(
+          'For security reasons, password resets are done by your '
+          'Administrator. Please contact them and ask them to reset your '
+          'password from the Users page. They will give you a new password '
+          'that you can use to log in and then change in Settings.',
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.5,
+            decoration: TextDecoration.none,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Close',
+              style: TextStyle(decoration: TextDecoration.none),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/contact');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text(
+              'Contact care home',
+              style: TextStyle(decoration: TextDecoration.none),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -324,9 +375,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const Spacer(),
               TextButton(
-                onPressed: () {
-                  // Forgot password flow arrives in a later step.
-                },
+                onPressed: _showForgotPasswordDialog,
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(0, 0),
@@ -375,21 +424,28 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          // "Need help? Contact us" - now clickable.
           Center(
-            child: Text.rich(
-              TextSpan(
+            child: RichText(
+              text: TextSpan(
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textMuted,
+                  decoration: TextDecoration.none,
                 ),
-                children: const [
-                  TextSpan(text: 'Need help? '),
+                children: [
+                  const TextSpan(text: 'Need help? '),
                   TextSpan(
                     text: 'Contact us',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.none,
                     ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () {
+                        Navigator.pushNamed(context, '/contact');
+                      },
                   ),
                 ],
               ),
@@ -463,4 +519,4 @@ class _RoleOption {
   const _RoleOption(this.label, this.icon);
   final String label;
   final IconData icon;
-}
+} 
